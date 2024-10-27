@@ -1,7 +1,7 @@
 #include <nc/socket.hpp>
 
 // auxiliary
-const char *nc::errString(status errcode) {
+const char *nc::errString(nc::status errcode) {
   switch (errcode) {
     case nc::status::good: return "Success";
     // WARNING
@@ -14,6 +14,9 @@ const char *nc::errString(status errcode) {
     case nc::status::SOCKET_CREATION_FAILED: return "FATAL - socket function failed returning INVALID_SOCKET";
     case nc::status::CONNECT_FAILED: return "FATAL - socket couldn't connect to given ip address and port";
     case nc::status::BIND_FAILED: return "FATAL - socket couldn't bind to given port";
+    case nc::status::FAILED_INIT_ENCRYP_CTX: return "FATAL - failed to initalize encrypted context";
+    case nc::status::FAILED_ENCRYPTED_HANDSHAKE: return "FATAL - failed to compelte the encrypted handshake with the third party";
+    // DEFAULT
     default: return "Status Code is Invalid";
   };
 }
@@ -23,7 +26,6 @@ void nc::SocketTCP::__deconstruct() {
   #ifdef _WIN32
     WSACleanup();
   #endif
-  this->close();
 }
 
 nc::status nc::SocketTCP::initIPv4() {
@@ -116,4 +118,77 @@ nc::status nc::SocketTCP::listen(int maxNumberConnections) {
     return nc::status::LISTEN_FAILED;
   }
   return nc::status::good;
+}
+
+// TCP SSL Socket
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+nc::status nc::SocketSSL::init() {
+  SSL_library_init();
+  OpenSSL_add_all_algorithms();
+  SSL_load_error_strings();
+  ERR_load_BIO_strings();
+  ERR_load_crypto_strings();
+  return nc::status::good;
+}
+nc::status nc::SocketSSL::clean() {
+  EVP_cleanup();
+  return nc::status::good;
+}
+
+nc::status nc::SocketSSL::openIPv4(unsigned int port, const char *ipaddr, void *ctx) {
+  if (!this->m_ctx) {    
+    const SSL_METHOD *method = TLS_client_method();  // Use TLS_client_method() for flexibility
+    this->m_ctx = SSL_CTX_new(method);    
+    if (!this->m_ctx) {
+      return nc::status::FAILED_INIT_ENCRYP_CTX;    
+    }  
+  }
+  if (!this->m_ssl) {    
+    this->m_ssl = SSL_new((SSL_CTX*)this->m_ctx);      
+    // set fd    
+    this->m_sock = ::socket(AF_INET, SOCK_STREAM, 0);    
+    // header    
+    struct sockaddr_in server_addr;    
+    server_addr.sin_family = AF_INET;    
+    server_addr.sin_port = htons(port);    
+    ::inet_pton(AF_INET, ipaddr, &server_addr.sin_addr); // ip_addr    
+    // connect    
+    if (connect(this->m_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {      
+      ::close(this->m_sock);      
+      return nc::status::SOCKET_CREATION_FAILED;
+    }    
+    // bind ssl    
+    SSL_set_fd((SSL*)this->m_ssl, this->m_sock);    
+    // set the connection state
+    SSL_set_connect_state((SSL*)this->m_ssl);
+    // start ssl connection    
+    if (SSL_connect((SSL*)this->m_ssl) <= 0) {         
+      return nc::status::FAILED_ENCRYPTED_HANDSHAKE;
+    }
+  }
+  return nc::status::good;
+}
+nc::status nc::SocketSSL::close() {
+  if (this->m_ssl) {    
+    SSL_shutdown((SSL*)this->m_ssl);    
+    SSL_free((SSL*)this->m_ssl);    
+    this->m_ssl = nullptr;  
+  }  
+  if (this->m_sock >= 0) {    
+    ::closesocket(this->m_sock);    
+    this->m_sock = INVALID_SOCKET;
+  }  
+  if (m_ctx) {    
+    SSL_CTX_free((SSL_CTX*)this->m_ctx);    
+    this->m_ctx = nullptr;  
+  }
+  return nc::status::good;
+}
+ssize_t nc::SocketSSL::write(const char *buf, size_t size) {
+  return SSL_write((SSL*)this->m_ssl, buf, size);
+}
+ssize_t nc::SocketSSL::read(char *buf, size_t size) {
+  return SSL_read((SSL*)this->m_ssl, buf, size);
 }

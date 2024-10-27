@@ -2,17 +2,30 @@
 A C++ Networking library
 
 ## Install
-#### Makefile
 #### CMake
-#### Vcpkg
+Simple Install using...
+```bash
+mkdir build && cd build
+cmake ..
+cmake --build . --parallel
+sudo cmake --install .
+```
 
-## Dependicies
-### Open SSL
+Then Link using...
+```cmake
 
-### OS Api
-Win32 API (NotImplementedYet)
-Win64 API (NotImplementedYet)
-POSIX     (NotImplementedYet)
+find_library(netcpp REQUIRED)
+
+add_exectuable(yourApp ...)
+
+target_link_libraries(yourApp netcpp)
+
+```
+or
+```bash
+g++ yourprogram.cpp -lnetcpp
+```
+
 
 ## Documentation
 ### Socket Class

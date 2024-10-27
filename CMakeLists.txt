@@ -2,16 +2,23 @@ cmake_minimum_required(VERSION 3.22.1) # my version
 
 project(netcpp VERSION 0.0.0)
 
-set(LINK_LIBS)
 set(SRC_FILES src/socket.cpp)
 
 
 include(GNUInstallDirs)
 
+list(APPEND CMAKE_PREFIX_PATH "/usr/local/ssl/")
+
+# Find OpenSSL package
+find_package(OpenSSL REQUIRED)
+
+# Include OpenSSL headers
+include_directories(${OPENSSL_INCLUDE_DIR})
+
 add_library(netcpp SHARED ${SRC_FILES})
 add_library(netcpp::netcpp ALIAS netcpp)
 
-target_link_libraries(netcpp PRIVATE ${LINK_LIBS})
+target_link_libraries(netcpp PRIVATE OpenSSL::Crypto OpenSSL::SSL)
 
 target_include_directories(
   netcpp
