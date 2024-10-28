@@ -3,24 +3,29 @@
 
 #include <stdio.h>
 
+#define CheckError \
+  if (s != nc::status::good) {  \
+    printf("%s %c", nc::errString(s), '\n'); \
+    return 1;  \
+  }
+
 int main() {
   nc::SocketTCP sock;
 
-  sock.initIPv4();
-  sock.openIPv4(80,"127.0.0.1");
+  nc::status s;
 
-  if (sock == INVALID_SOCKET) { return 1; }
-  if (!sock) { return 2; }
+  s = sock.initIPv4(); CheckError
+  s = sock.openIPv4(80,"142.250.179.238"); CheckError
 
-  sock.timeout(3,0); // timeout 1 second
+  s = sock.timeout(3,0); CheckError
+
+  char sendMsg[] = "Sorry Google, Not Really";
+  ssize_t bsent = sock.send(sendMsg, sizeof(sendMsg));
 
   char buffer[1024];
-  size_t brecved = sock.recv(buffer,sizeof(buffer));
+  size_t brecved = sock.recv(buffer,sizeof(buffer)); CheckError
 
   fwrite(buffer,brecved,1,stdout);
 
-  char sendMsg[] = "Sorry Google, Not Really";
-  sock.send(sendMsg, sizeof(sendMsg));
-
-  sock.close();
+  s = sock.close(); CheckError
 }

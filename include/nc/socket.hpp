@@ -95,6 +95,8 @@ class SocketSSL : public SocketTCP {
   using SocketTCP::close;
   using SocketTCP::write;
   using SocketTCP::read;
+  using SocketTCP::send;
+  using SocketTCP::recv;
 public: // should be private
   void *m_ssl = nullptr; // typed in implementation (dodges openssl global include)
   void *m_ctx = nullptr;
@@ -115,6 +117,8 @@ public:
   
   ssize_t write(const void *buf, size_t size);
   ssize_t read(void *buf, size_t size);
+  ssize_t send(const void *buf, size_t size) { return this->write(buf, size); }
+  ssize_t recv(void *buf, size_t size) { return this->read(buf, size); }
 };
 
 };
