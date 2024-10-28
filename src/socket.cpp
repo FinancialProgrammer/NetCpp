@@ -28,14 +28,21 @@ void nc::SocketTCP::__deconstruct() {
   #endif
 }
 
+nc::status nc::SocketTCP::init() {
+  #ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+      this->m_sock = INVALID_SOCKET;
+      return nc::status::OS_CTX_START_FAILED;
+    }
+  #endif
+}
+
 nc::status nc::SocketTCP::initIPv4() {
-#ifdef _WIN32
-  WSADATA wsaData;
-  if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-    this->m_sock = INVALID_SOCKET;
+  if (this->init() != nc::status::good) {
     return nc::status::OS_CTX_START_FAILED;
   }
-#endif
+
   // AF_INET tells api to use ipv4
   // SOCK_STREAM tells api to use tcp
   this->m_sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -77,10 +84,10 @@ nc::status nc::SocketTCP::close() {
 }
 
 // socket interaction
-ssize_t nc::SocketTCP::write(const char *buf, size_t size) {
+ssize_t nc::SocketTCP::write(const void *buf, size_t size) {
   return ::send(this->m_sock, buf, size, 0);
 }
-ssize_t nc::SocketTCP::read(char *buf, size_t size) {
+ssize_t nc::SocketTCP::read(void *buf, size_t size) {
   return ::recv(this->m_sock, buf, size, 0);
 }
 nc::status nc::SocketTCP::accept(nc::SocketTCP *client) {
@@ -138,6 +145,10 @@ nc::status nc::SocketSSL::clean() {
 }
 
 nc::status nc::SocketSSL::openIPv4(unsigned int port, const char *ipaddr, void *ctx) {
+  if (this->init() != nc::status::good) {
+    return nc::status::OS_CTX_START_FAILED;
+  }
+
   if (!this->m_ctx) {    
     const SSL_METHOD *method = TLS_client_method();  // Use TLS_client_method() for flexibility
     this->m_ctx = SSL_CTX_new(method);    
@@ -158,7 +169,7 @@ nc::status nc::SocketSSL::openIPv4(unsigned int port, const char *ipaddr, void *
     if (connect(this->m_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {      
       ::close(this->m_sock);      
       return nc::status::SOCKET_CREATION_FAILED;
-    }    
+    }
     // bind ssl    
     SSL_set_fd((SSL*)this->m_ssl, this->m_sock);    
     // set the connection state
@@ -186,9 +197,9 @@ nc::status nc::SocketSSL::close() {
   }
   return nc::status::good;
 }
-ssize_t nc::SocketSSL::write(const char *buf, size_t size) {
+ssize_t nc::SocketSSL::write(const void *buf, size_t size) {
   return SSL_write((SSL*)this->m_ssl, buf, size);
 }
-ssize_t nc::SocketSSL::read(char *buf, size_t size) {
+ssize_t nc::SocketSSL::read(void *buf, size_t size) {
   return SSL_read((SSL*)this->m_ssl, buf, size);
 }

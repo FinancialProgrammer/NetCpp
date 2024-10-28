@@ -16,7 +16,7 @@ Then Link using...
 
 find_library(netcpp REQUIRED)
 
-add_exectuable(yourApp ...)
+add_executable(yourApp ...)
 
 target_link_libraries(yourApp netcpp)
 
@@ -29,8 +29,9 @@ g++ yourprogram.cpp -lnetcpp
 
 ## Documentation
 ### Socket Class
-Allows an encryption wrapper <br>
+Default socket which should only be used for internal communciations between programs.
 
-### Http Socket
+### SocketSSL
 Built from the socket class in pair with Open SSL <br>
-Uses SSL/TLS Encryption to support communication with http sockets <br>
+Uses SSL/TLS Encryption to support communication with https sockets <br>
+

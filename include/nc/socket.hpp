@@ -66,17 +66,17 @@ public:
   void __deconstruct(); // in case relying on deconstructor is unreliable
 
   // socket init && deinit
-  status init(); // base init called by other inits (WSAStartup and easier encyption wrapper development)
-  status initIPv4();
+  status init(); // base init called by other inits (WSAStartup)
+  status initIPv4(); // (easier encyption wrapper development)
   status openIPv4(unsigned int port, const char *ipaddr = "127.0.0.1"); // open connection to port at ip address
   status bindIPv4(unsigned int port); // bind socket to port
   status close();
 
   // socket interaction
-  ssize_t write(const char *buf, size_t size);
-  ssize_t read(char *buf, size_t size);
-  ssize_t send(const char *buf, size_t size) { return this->write(buf, size); }
-  ssize_t recv(char *buf, size_t size) { return this->read(buf, size); }
+  ssize_t write(const void *buf, size_t size);
+  ssize_t read(void *buf, size_t size);
+  ssize_t send(const void *buf, size_t size) { return this->write(buf, size); }
+  ssize_t recv(void *buf, size_t size) { return this->read(buf, size); }
 
   status accept(nc::SocketTCP *client);
 
@@ -91,6 +91,10 @@ public:
 * depends on OpenSSL
 */
 class SocketSSL : public SocketTCP {
+  using SocketTCP::openIPv4;
+  using SocketTCP::close;
+  using SocketTCP::write;
+  using SocketTCP::read;
 public: // should be private
   void *m_ssl = nullptr; // typed in implementation (dodges openssl global include)
   void *m_ctx = nullptr;
@@ -109,8 +113,8 @@ public:
   status openIPv4(unsigned int port, const char *ipaddr = "127.0.0.1", void *ctx = nullptr); // pass a SSL_CTX
   status close();
   
-  ssize_t write(const char *buf, size_t size);
-  ssize_t read(char *buf, size_t size);
+  ssize_t write(const void *buf, size_t size);
+  ssize_t read(void *buf, size_t size);
 };
 
 };
@@ -144,14 +148,21 @@ public:
     #endif
   }
 
+  nc::status nc::SocketTCP::init() {
+    #ifdef _WIN32
+      WSADATA wsaData;
+      if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        this->m_sock = INVALID_SOCKET;
+        return nc::status::OS_CTX_START_FAILED;
+      }
+    #endif
+  }
+
   nc::status nc::SocketTCP::initIPv4() {
-  #ifdef _WIN32
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-      this->m_sock = INVALID_SOCKET;
+    if (this->init() != nc::status::good) {
       return nc::status::OS_CTX_START_FAILED;
     }
-  #endif
+
     // AF_INET tells api to use ipv4
     // SOCK_STREAM tells api to use tcp
     this->m_sock = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -193,10 +204,10 @@ public:
   }
 
   // socket interaction
-  ssize_t nc::SocketTCP::write(const char *buf, size_t size) {
+  ssize_t nc::SocketTCP::write(const void *buf, size_t size) {
     return ::send(this->m_sock, buf, size, 0);
   }
-  ssize_t nc::SocketTCP::read(char *buf, size_t size) {
+  ssize_t nc::SocketTCP::read(void *buf, size_t size) {
     return ::recv(this->m_sock, buf, size, 0);
   }
   nc::status nc::SocketTCP::accept(nc::SocketTCP *client) {
@@ -254,6 +265,10 @@ public:
   }
 
   nc::status nc::SocketSSL::openIPv4(unsigned int port, const char *ipaddr, void *ctx) {
+    if (this->init() != nc::status::good) {
+      return nc::status::OS_CTX_START_FAILED;
+    }
+
     if (!this->m_ctx) {    
       const SSL_METHOD *method = TLS_client_method();  // Use TLS_client_method() for flexibility
       this->m_ctx = SSL_CTX_new(method);    
@@ -274,7 +289,7 @@ public:
       if (connect(this->m_sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {      
         ::close(this->m_sock);      
         return nc::status::SOCKET_CREATION_FAILED;
-      }    
+      }
       // bind ssl    
       SSL_set_fd((SSL*)this->m_ssl, this->m_sock);    
       // set the connection state
@@ -302,10 +317,10 @@ public:
     }
     return nc::status::good;
   }
-  ssize_t nc::SocketSSL::write(const char *buf, size_t size) {
+  ssize_t nc::SocketSSL::write(const void *buf, size_t size) {
     return SSL_write((SSL*)this->m_ssl, buf, size);
   }
-  ssize_t nc::SocketSSL::read(char *buf, size_t size) {
+  ssize_t nc::SocketSSL::read(void *buf, size_t size) {
     return SSL_read((SSL*)this->m_ssl, buf, size);
   }
 #endif

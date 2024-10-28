@@ -17,14 +17,14 @@ int main() {
   sock.timeout(3,0); // timeout 1 second
 
   char sendMsg[] = 
-    "GET https://google.com HTTP/1.1\n"
-    "Host: https://google.com\n"
-    "User-Agent: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.13) Gecko/20101203 Firefox/3.6.13\n"
-    "Accept: text/html\n"
-    "Accept-Language: en-gb,en;q=0.5\n"
-    "Accept-Charset: ISO-8859-1,utf-8;\n"
+    "GET https://google.com HTTP/1.1"
+    "Host: https://google.com"
+    "User-Agent: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.13) Gecko/20101203 Firefox/3.6.13"
+    "Accept: text/html"
+    "Accept-Language: en-gb,en;q=0.5"
+    "Accept-Charset: ISO-8859-1,utf-8;"
   ;
-  sock.send(sendMsg, sizeof(sendMsg));
+  size_t bsent = sock.send(sendMsg, sizeof(sendMsg));
 
   char buffer[1024];
   size_t brecved = sock.recv(buffer,sizeof(buffer));
